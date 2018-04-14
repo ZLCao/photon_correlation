@@ -20,7 +20,7 @@ class G2_T3(GN):
         self._counts = dict()
 
         for c0, c1, pulse_left, pulse_right, \
-            time_left, time_right, counts in stream_in:
+            time_left, time_right, counts in csv.reader(stream_in):
             correlation = (int(c0), int(c1))
 
             pulse_bin = (float(pulse_left), float(pulse_right))
@@ -54,7 +54,7 @@ class G2_T3(GN):
                     yield(line)
 
     def pulse_bin_counts(self, correlation, pulse_bin):
-        return(sum(self.counts()[correlation][pulse_bin].values()))
+        return(sum(self._counts[correlation][pulse_bin].values()))
     
     def center_side_ratios(self, center=t3_center, side=t3_side):
         try:
@@ -62,7 +62,7 @@ class G2_T3(GN):
         except:
             self._center_side_ratios = dict()
                 
-            for correlation, g2 in self:
+            for correlation in self:
                 center_counts = self.pulse_bin_counts(correlation, center)
                 side_counts = self.pulse_bin_counts(correlation, side)
 
@@ -76,11 +76,16 @@ class G2_T3(GN):
         Return the center/side ratio formed by summing over
         all cross-correlations in the g2.
         """
+        try:
+            self._center_side_ratio
+        except:
+            self._center_side_ratio = None
+
         if self._center_side_ratio is None:
             center_total = 0
             side_total = 0
             
-            for correlation, ratio in self.g2_ratios().items():               
+            for correlation, ratio in self.center_side_ratios().items():
                 if is_cross_correlation(correlation):
                     center, side = ratio
                 
@@ -125,7 +130,7 @@ class G2_T3(GN):
         self.add_to_axes(ax)
         return(fig)
 
-    def add_to_axis(self, ax):
+    def add_to_axes(self, ax):
         g2 = self.autocorrelation()
 
         max_time = round(max(map(lambda x: x[0], g2[(-0.5, 0.5)]))*1e-3)
@@ -213,11 +218,10 @@ class G2_T3(GN):
 class G2_T2(GN):       
     def from_file(self, filename, int_counts=True):
         with open(filename) as stream_in:
-            return(self.from_stream(csv.reader(stream_in),
-                                    int_counts=int_counts))
+            return(self.from_stream(stream_in, int_counts=int_counts))
 
     def from_stream(self, stream_in, int_counts=True):
-        for c0, c1, time_left, time_right, counts in stream_in:
+        for c0, c1, time_left, time_right, counts in csv.reader(stream_in):
             correlation = (int(c0), int(c1))
             time_bin = (float(time_left), float(time_right))
 
@@ -289,7 +293,7 @@ class G2_T2(GN):
 
         g2 = sorted(self.autocorrelation().items())
 
-        times = list(map(lambda x: mean(x[0])*1e-3, g2))
+        times = list(map(lambda x: statistics.mean(x[0])*1e-3, g2))
         counts = list(map(lambda x: x[1], g2))
 
         ax.plot(times, counts)
@@ -301,6 +305,6 @@ class G2_T2(GN):
     
         return(fig)
 
-if __name__ == "__main__":
-    g2 = G2_T3(filename="/home/tsbischof/Documents/data/microscopy/analysis/triexciton/2014-09-04_oc2014-04-08/oc2014-04-08_1e-5_dot_009_250nW_000.ht3.g2.run/g2")
-    g2.to_file("/home/tsbischof/tmp/blargh.g2")
+#if __name__ == "__main__":
+#    g2 = G2_T3(filename="/home/tsbischof/Documents/data/microscopy/analysis/triexciton/2014-09-04_oc2014-04-08/oc2014-04-08_1e-5_dot_009_250nW_000.ht3.g2.run/g2")
+#    g2.to_file("/home/tsbischof/tmp/blargh.g2")

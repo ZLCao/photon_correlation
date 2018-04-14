@@ -9,7 +9,7 @@ from .util import *
 from .Exponential import *
 
 max_val_default = 0.95
-min_val_default = 0.1
+min_val_default = 0
 
 class Lifetime(object):
     def __init__(self, counts, times=None, resolution=None):
@@ -18,6 +18,7 @@ class Lifetime(object):
         generated from the resolution of the measurement.
         """
         self.times = times
+        self.resolution = resolution
         
         if self.times is None:
             self.times = [(i*self.resolution,
@@ -110,6 +111,7 @@ class Lifetime(object):
         to max_val of their maximum value, but before they reach min_val of
         their maximum value.
         """
+
         if min_val is None:
             min_val = 0
 
@@ -126,8 +128,12 @@ class Lifetime(object):
         counts_upper = min(self.counts[origin:],
                            key=lambda x: abs(x - max_counts*max_val))
 
-        index_left = last_index(self.counts, counts_upper)
-        index_right = first_index(self.counts, counts_lower)
+        index_left = last_index(self.counts[origin:], counts_upper) + origin
+        if counts_lower:
+            index_right = first_index(self.counts[origin:],
+                                      counts_lower) + origin
+        else:
+            index_right = self.final_nonzero()
 
         return(self.range(self.time_bins[index_left],
                           self.time_bins[index_right]))
@@ -140,16 +146,6 @@ class Lifetime(object):
                         initial_conditions=None,
                         error_func="square difference",
                         **args):
-        if initial_conditions is None:
-            initial_conditions = [1, 1]*n_exponentials
-        else:
-            n_exponentials = len(initial_conditions) / 2
-
-        if n_exponentials*2 != len(initial_conditions):
-            raise(ValueError("Dimension mismatch: expected {} parameters for "
-                             "{} exponentials, but got {}".format(
-                                 n_exponentials*2, n_exponentials,
-                                 len(initial_conditions))))
         
         fit_times = list()
         fit_counts = list()
@@ -159,37 +155,74 @@ class Lifetime(object):
         elif time_range is not None:
             fit_data = self.range(*time_range)
         else:
-            fit_data = self
+            fit_data = self.fit_data()
 
         for fit_time, fit_count in zip(fit_data.time_bins, fit_data.counts):
             if fit_count != 0:
                 fit_times.append(fit_time)
                 fit_counts.append(fit_count)
 
+        if initial_conditions is None:
+            init_a = max(fit_counts)
+            initial_conditions = [init_a/n_exponentials, 1/fit_times[-1]] \
+                                 * n_exponentials + [0]
+        else:
+            if len(initial_conditions) % 2:
+                n_exponentials = (len(initial_conditions)-1)/2
+            else:
+                n_exponentials = len(initial_conditions) / 2
+                initial_conditions.append(0)
+
+        if n_exponentials*2+1 != len(initial_conditions):
+            raise(ValueError("Dimension mismatch: expected {} parameters for "
+                             "{} exponentials, but got {}".format(
+                                 n_exponentials*2, n_exponentials,
+                                 len(initial_conditions))))
+
         fit_times = numpy.array(fit_times)
         fit_counts = numpy.array(fit_counts)
 
-        def error(params):
-            if any(map(lambda x: x < 0, params)):
-                return(float("inf"))
+        # def error(params):
+            # if any(map(lambda x: x < 0, params)):
+                # return(float("inf"))
 
-            if not sorted(params[1::2]) == list(params[1::2]):
-                return(float("inf"))
+            # if not sorted(params[1::2]) == list(params[1::2]):
+                # return(float("inf"))
             
-            data = fit_counts
-            model = MultiExponential(params)(fit_times)
+            # data = fit_counts
+            # model = MultiExponential(params)(fit_times)
 
-            if error_func == "square difference":
-                return(sum(map(lambda x, y: (x-y)**2, data, model)))
-            elif error_func == "percent":
-                return(sum(map(lambda x, y: abs((x-y)/x) if x > 0 else 0,
-                               data, model)))
-            else:
-                raise(ValueError("Unknown error type: {}".format(error_func)))
+            # if error_func == "square difference":
+                # return(sum(map(lambda x, y: (x-y)**2, data, model)))
+            # elif error_func == "percent":
+                # return(sum(map(lambda x, y: abs((x-y)/x) if x > 0 else 0,
+                               # data, model)))
+            # else:
+                # raise(ValueError("Unknown error type: {}".format(error_func)))
         
-        fit = scipy.optimize.fmin(error, initial_conditions, **args)
+        # fit = scipy.optimize.fmin(error, initial_conditions, **args)
 
-        return(MultiExponential(fit))
+        def func(x, *params):
+           # amp = params[::2]
+           # rate = list(params[1::2]).append(0)
+           amp = list()
+           rate = list()
+           for a in params[::2]:
+               amp.append(a)
+           for r in params[1::2]:
+               rate.append(r)
+           rate.append(0)
+           return sum(map(lambda a, r:
+                      a * numpy.exp(-r*(x-fit_times[0])), amp, rate))
+
+        popt, pcov = scipy.optimize.curve_fit(func, fit_times, fit_counts,
+                p0=initial_conditions, bounds=(0, numpy.inf), method='dogbox')
+
+        fit_out = func(numpy.array(fit_data.time_bins), *popt)
+
+        return(Lifetime(fit_out, fit_data.times), popt, pcov)
+
+        # return(MultiExponential(fit))
 
     def fit(self, fit_f, p0=None, error="least squares", params_check=None,
             force_calculation=False, **fmin_args):

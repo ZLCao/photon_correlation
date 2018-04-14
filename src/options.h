@@ -149,7 +149,8 @@ typedef struct {
 	unsigned int sync_divider;
 
 /* threshold */
-	unsigned int threshold;
+	unsigned int threshold_min;
+	unsigned int threshold_max;
 
 /* time threshold */
 	unsigned long long time_threshold;
@@ -180,7 +181,8 @@ enum { OPT_HELP, OPT_VERSION,
 		OPT_FILTER_AFTERPULSING,
 		OPT_TIME_GATING,
 		OPT_SYNC_CHANNEL, OPT_SYNC_DIVIDER,
-		OPT_THRESHOLD,
+		OPT_THRESHOLD_MIN,
+		OPT_THRESHOLD_MAX,
 		OPT_TIME_THRESHOLD,
 		OPT_EOF };
 

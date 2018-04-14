@@ -59,6 +59,7 @@ int gn_run(program_options_t *program_options, int const argc,
 		char * const *argv) {
 	int result = PC_SUCCESS;
 	FILE *stream_in = NULL;
+	FILE *stream_out = NULL;
 	pc_options_t *options = pc_options_alloc();
 
 	if ( options == NULL ) {
@@ -84,17 +85,18 @@ int gn_run(program_options_t *program_options, int const argc,
 
 	if ( result == PC_SUCCESS ) {
 		debug("Opening stream in (%s).\n", options->filename_in);
-		result = stream_open(&stream_in, stdin, options->filename_in, "r");
+		result = streams_open(&stream_in, options->filename_in,
+				&stream_out, options->filename_out);
 	}
 
 	if ( result == PC_SUCCESS ) {
 		debug("Dispatching.\n");
-		gn(stream_in, NULL, options);
+		gn(stream_in, stream_out, options);
 	}
 
 	debug("Cleaning up.\n");
 	pc_options_free(&options);
-	stream_close(stream_in, stdin);
+	streams_close(stream_in, stream_out);
 
 	return(pc_check(result));
 }
@@ -112,7 +114,8 @@ int gn(FILE *stream_in, FILE *stream_out, pc_options_t const *options) {
 
 	unsigned long long bin_width;
 
-	FILE *gn_file = NULL;
+	FILE *gn_file = stream_out;
+//	FILE *gn_file = NULL;
 	FILE *count_all_file = NULL;
 	FILE *intensity_file = NULL;
 	FILE *number_file = NULL;
@@ -125,6 +128,7 @@ int gn(FILE *stream_in, FILE *stream_out, pc_options_t const *options) {
 	char *intensity_filename = NULL;
 	char *number_filename = NULL;
 
+/*
 	debug("Initializing options\n");
 	if ( result == PC_SUCCESS ) {
 		if ( options->filename_out != NULL ) {
@@ -138,6 +142,7 @@ int gn(FILE *stream_in, FILE *stream_out, pc_options_t const *options) {
 			result = PC_ERROR_OPTIONS;
 		}
 	}
+*/
 
 	if ( result == PC_SUCCESS ) {
 		debug("Allocating memory.\n");
@@ -148,17 +153,22 @@ int gn(FILE *stream_in, FILE *stream_out, pc_options_t const *options) {
 		count_all = intensity_photon_alloc(options->channels, options->mode);
 		intensity = intensity_photon_alloc(options->channels, options->mode);
 		number = photon_number_alloc(options->channels * 64);
-	
+
+/*	
 		run_dir = malloc(sizeof(char)*(strlen(base_name)+128));
 		gn_filename = malloc(sizeof(char)*16);
 		count_all_filename = malloc((strlen("count_all")+1)*sizeof(char));
 		intensity_filename = malloc((strlen("intensity")+1)*sizeof(char));
 		number_filename = malloc((strlen("number.td")+1)*sizeof(char));
+*/
 
 		if ( photon_stream == NULL || gn == NULL || count_all == NULL ||
+				intensity == NULL || number == NULL ) {
+/*
 				intensity == NULL || number == NULL ||
 				run_dir == NULL || gn_filename == NULL || 
 				count_all_filename == NULL || intensity_filename == NULL ) {
+*/
 			result = PC_ERROR_MEM;
 		}
 	}
@@ -197,6 +207,7 @@ int gn(FILE *stream_in, FILE *stream_out, pc_options_t const *options) {
 			
 	}
 
+/*
 	if ( result == PC_SUCCESS ) {
 		sprintf(run_dir, "%s.g%u.run", base_name, options->order);
 		if ( mkdir(run_dir, 
@@ -224,8 +235,10 @@ int gn(FILE *stream_in, FILE *stream_out, pc_options_t const *options) {
 			fflush(options_file);
 		}
 	}
+*/
 
 	/* Set up the files */ 
+/*
 	debug("Opening files.\n");
 	if ( result == PC_SUCCESS ) {	
 		sprintf(count_all_filename, "count_all");
@@ -277,6 +290,7 @@ int gn(FILE *stream_in, FILE *stream_out, pc_options_t const *options) {
 			}
 		}
 	}
+*/
 
 	/* Start the actual calculation */
 	if ( result == PC_SUCCESS ) {
@@ -306,6 +320,8 @@ int gn(FILE *stream_in, FILE *stream_out, pc_options_t const *options) {
 				pc_status_print("gn", photon_number++, options);
 
 				photon_gn_push(gn, &(photon_stream->photon));
+
+/*
 				intensity_photon_push(count_all, &(photon_stream->photon));
 				intensity_photon_push(intensity, &(photon_stream->photon));
 
@@ -316,6 +332,7 @@ int gn(FILE *stream_in, FILE *stream_out, pc_options_t const *options) {
 				if ( options->mode == MODE_T3 ) {
 					photon_number_push(number, &(photon_stream->photon));
 				}
+*/
 			}
 	
 			debug("Window over.\n");
@@ -333,6 +350,7 @@ int gn(FILE *stream_in, FILE *stream_out, pc_options_t const *options) {
 				}
 			}
 
+/*
 			if ( options->mode == MODE_T3 && number_file != NULL ) {
 				photon_number_flush(number);
 				if ( options->window_width == 0 ) {
@@ -344,13 +362,15 @@ int gn(FILE *stream_in, FILE *stream_out, pc_options_t const *options) {
 					photon_number_fprintf_counts(number_file, number);
 				}
 			}
+*/
 
 			photon_stream_next_window(photon_stream);
 		}
 
 		number_file != NULL ? fclose(number_file) : 0;
-		gn_file != NULL ? fclose(gn_file) : 0;
+//		gn_file != NULL ? fclose(gn_file) : 0;
 
+/*
 		if ( result == PC_SUCCESS ) {
 			intensity_photon_flush(count_all);
 			while ( intensity_photon_next(count_all) == PC_SUCCESS ) {
@@ -362,6 +382,7 @@ int gn(FILE *stream_in, FILE *stream_out, pc_options_t const *options) {
 				intensity_photon_fprintf(intensity_file, intensity);
 			}
 		}
+*/
 	}
 
 	photon_stream_free(&photon_stream);

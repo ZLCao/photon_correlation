@@ -155,8 +155,8 @@ photon_threshold_t *photon_threshold_alloc(int const mode,
 	return(pt);
 }
 
-void photon_threshold_init(photon_threshold_t *pt, 
-		long long const window_width, long long const threshold,
+void photon_threshold_init(photon_threshold_t *pt, long long const window_width,
+		long long const threshold_min ,long long const threshold_max,
 		int const set_lower_bound, long long const lower_bound,
 		int const set_upper_bound, long long const upper_bound) {
 	pt->flushing = false;
@@ -165,7 +165,8 @@ void photon_threshold_init(photon_threshold_t *pt,
 			set_lower_bound, lower_bound,
 			set_upper_bound, upper_bound);
 	photon_queue_init(pt->queue);
-	pt->threshold = threshold;
+	pt->threshold_min = threshold_min;
+	pt->threshold_max = threshold_max;
 }
 
 int photon_threshold_push(photon_threshold_t *pt, photon_t const *photon) {
@@ -191,7 +192,8 @@ int photon_threshold_next(photon_threshold_t *pt, photon_t *photon) {
 		if ( pt->flushing ) {
 			debug("Flushing.\n");
 			if ( pt->yield_window || 
-					photon_queue_size(pt->queue) >= pt->threshold ) {
+					( photon_queue_size(pt->queue) >= pt->threshold_min &&
+					  photon_queue_size(pt->queue) <  pt->threshold_max ) ) {
 				pt->yield_window = true;
 				photon_queue_pop(pt->queue, photon);
 				return(PC_SUCCESS);
@@ -207,7 +209,8 @@ int photon_threshold_next(photon_threshold_t *pt, photon_t *photon) {
 			if ( status == PC_RECORD_AFTER_WINDOW ) {
 				debug("Queue size: %zu\n", photon_queue_size(pt->queue));
 				if ( pt->yield_window || 
-						(photon_queue_size(pt->queue)-1) >= pt->threshold ) {
+						( (photon_queue_size(pt->queue)-1) >= pt->threshold_min &&
+						  (photon_queue_size(pt->queue)-1) <  pt->threshold_max ) ) {
 
 /* Need one more photon to emit, since one of the photons in the queue is in
  * the next window.
@@ -255,7 +258,8 @@ int photon_threshold_next(photon_threshold_t *pt, photon_t *photon) {
 void photon_threshold_flush(photon_threshold_t *pt) {
 	pt->flushing = true;
 
-	if ( photon_queue_size(pt->queue) < pt->threshold ) {
+	if ( photon_queue_size(pt->queue) <  pt->threshold_min ||
+	     photon_queue_size(pt->queue) >= pt->threshold_max ) {
 		photon_queue_init(pt->queue);
 	}
 }
@@ -284,7 +288,8 @@ int photon_threshold(FILE *stream_in, FILE *stream_out,
 		result = PC_ERROR_MEM;
 	} else {
 		photon_stream_init(photons, stream_in);
-		photon_threshold_init(pt, options->window_width, options->threshold,
+		photon_threshold_init(pt, options->window_width,
+					options->threshold_min, options->threshold_max,
 					options->set_start, options->start,
 					options->set_stop, options->stop);
 	}

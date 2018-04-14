@@ -2,7 +2,7 @@ import math
 
 import numpy
 
-from photon_correlation import util
+from . import util
 
 class Exponential:
     def __init__(self, magnitude, rate):

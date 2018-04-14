@@ -32,7 +32,7 @@ class G1(GN):
         """
         curves = dict()
         
-        for line in stream_in:
+        for line in csv.reader(stream_in):
             curve = int(line[0])
             time_left = float(line[1])
             time_right = float(line[2])
@@ -75,19 +75,20 @@ class G1(GN):
         max_xlim = 0
 
         for curve in self:
-            lifetime = self[curve]
-            if resolution is not None:
-                lifetime = lifetime.to_resolution(resolution)
-                
-            times = list(map(lambda x: x[0]*1e-3, lifetime.times))
-            counts = lifetime.counts
-                         
-            ax.semilogy(times, counts, label=str(curve))
-
-            my_max = times[final_nonzero(counts)]
-
-            if my_max > max_xlim:
-                max_xlim = my_max
+            if curve:
+                lifetime = self[curve]
+                if resolution is not None:
+                    lifetime = lifetime.to_resolution(resolution)
+                    
+                times = list(map(lambda x: x[0]*1e-3, lifetime.times))
+                counts = lifetime.counts
+                             
+                ax.semilogy(times, counts, label=str(curve))
+     
+                my_max = times[final_nonzero(counts)]
+     
+                if my_max > max_xlim:
+                    max_xlim = my_max
                 
         ax.set_xlabel("Time/ns")
         ax.set_ylabel("Counts")

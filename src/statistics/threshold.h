@@ -39,7 +39,8 @@
 #include "../photon/queue.h"
 
 typedef struct {
-	unsigned int threshold;
+	unsigned int threshold_min;
+	unsigned int threshold_max;
 	int flushing;
 	int yield_window;
 
@@ -51,8 +52,8 @@ typedef struct {
 
 photon_threshold_t *photon_threshold_alloc(int const mode, 
 		size_t const queue_size);
-void photon_threshold_init(photon_threshold_t *pt, 
-		long long const window_width, long long const threshold,
+void photon_threshold_init(photon_threshold_t *pt, long long const window_width,
+		long long const threshold_min, long long const threshold_max,
 		int const set_lower_bound, long long const lower_bound,
 		int const set_upper_bound, long long const upper_bound);
 int photon_threshold_push(photon_threshold_t *pt, photon_t const *photon);

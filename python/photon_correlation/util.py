@@ -11,8 +11,6 @@ import matplotlib.colors
 import matplotlib.cm as cm
 import numpy
 
-import photon_correlation as pc
-
 si_prefixes = {-9: r"\nano",
                -6: r"\micro",
                -3: r"\milli",

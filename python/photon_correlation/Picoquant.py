@@ -68,7 +68,9 @@ class Picoquant(object):
         the repetition rate of the laser.
         """
         sync_rate = None
-        if self.header().has_option("header", "syncrate"):
+        if self.header().has_option("header", "InpRate0"):
+            return(self.header().getfloat("header", "InpRate0"))
+        elif self.header().has_option("header", "syncrate"):
             return(self.header().getfloat("header", "syncrate"))
         else:
             return(self.header().getfloat("header", "inprate[0]"))
@@ -77,7 +79,12 @@ class Picoquant(object):
         """
         Return the number of signal channels present in the device.
         """
-        return(self.header().getint("header", "inputchannelspresent"))
+        # return(self.header().getint("header", "inputchannelspresent"))
+        self._channels = self.header().getint("header", "ExtDevices")
+        if self._channels :
+            return( self._channels + 1 )
+        else:
+            return(2)
 
     def resolution(self):
         if not self._resolution:

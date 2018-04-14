@@ -5,6 +5,7 @@ import subprocess
 import re
 import math
 import logging
+from io import StringIO
 
 from .Picoquant import Picoquant
 from .Limits import Limits
@@ -20,8 +21,12 @@ def apply_t3_time_offsets(photons, time_offsets, repetition_rate):
 
     return(subprocess.Popen(cmd, stdin=photons.stdout, stdout=subprocess.PIPE))
 
-def picoquant(filename, print_every=1000000, time_offsets=None, number=None):
+def picoquant(filename, print_every=1000000, time_offsets=None,
+              number=None, convert=False):
     cmd = ["picoquant"]
+
+    if convert:
+        cmd.extend(["--to-t2"])
 
     if number is not None:
         cmd.extend(("--number", str(number)))
@@ -50,21 +55,11 @@ def picoquant(filename, print_every=1000000, time_offsets=None, number=None):
                 
     return(photons)
 
-def intensity(data_filename, dst_filename=None, bin_width=50000,
-              mode=None, channels=None, time_offsets=None,
-              repetition_rate=None):
+def intensity(data_filename, bin_width=50000, mode=None, channels=None,
+              count_all=False, time_offsets=None, repetition_rate=None):
     logging.info("Calculating intensity of {} with bin width of {}".format(
         data_filename, bin_width))
     pq = Picoquant(data_filename)
-
-    if dst_filename is None:    
-        dst_filename = os.path.join("{}.intensity.run".format(data_filename),
-                                    "intensity.{}".format(bin_width))
-
-    root_dir =  os.path.split(dst_filename)[0]
-
-    if not os.path.isdir(root_dir):
-        os.makedirs(root_dir)
 
     if channels is None:
         channels = pq.channels()
@@ -82,10 +77,15 @@ def intensity(data_filename, dst_filename=None, bin_width=50000,
     intensity_cmd = ["photon_intensity",
                      "--bin-width", str(bin_width),
                      "--mode", mode,
-                     "--channels", str(channels),
-                     "--file-out", dst_filename]
+                     "--channels", str(channels)]
 
-    subprocess.Popen(intensity_cmd, stdin=photons.stdout).wait()
+    if count_all:
+        intensity_cmd.append("--count-all")
+
+    intensity = StringIO(subprocess.Popen(intensity_cmd, stdin=photons.stdout,
+                         stdout=subprocess.PIPE).stdout.read().decode())
+
+    return(intensity)
 
 def number_to_channels(photons, correlate=False):
     cmd = ["photon_number_to_channels"]
@@ -104,49 +104,44 @@ def photon_time_threshold(photons, correlate=False, time_threshold=10000):
 
     return(subprocess.Popen(cmd, stdin=photons.stdout, stdout=subprocess.PIPE))
 
-def photon_threshold(photons, window_width=None, mode=None, threshold=None):
+def photon_threshold(photons, window_width=None, mode=None,
+                     threshold_min=None, threshold_max=None):
     cmd = ["photon_threshold",
            "--mode", mode,
            "--window-width", str(int(window_width)),
-           "--threshold", str(int(threshold))]
+           "--threshold_min", str(int(threshold_min)),
+           "--threshold_max", str(int(threshold_max))]
 
     return(subprocess.Popen(cmd, stdin=photons.stdout, stdout=subprocess.PIPE))
 
-def gn(data_filename, dst_dir=None, dst_filename=None,
-       photon_mode=None, gn_mode=None,
+def gn(data_filename, photon_mode=None, gn_mode=None,
        order=2, channels=None,
        time_bins=None, pulse_bins=None,
        repetition_rate=None, time_offsets=None,
        window_width=None, bin_width=None,
        photon_number=False, number_correlate=False,
-       time_bin_width=1024, time_threshold=None, threshold=None):
+       time_bin_width=1024, time_threshold=None,
+       threshold_min=None, threshold_max=None):
     logging.info("Calculating g{} for {}".format(order, data_filename))
+
+    DEFAULT_REPETITION_RATE = 4999990
 
     if not bin_width is None:
         logging.info("This is a time-dependent calculation with a bin "
                      "width of {}".format(bin_width))
-
-    if dst_filename:
-        pass
-    elif dst_dir is None:
-        dst_filename = data_filename
-    else:
-        dst_filename = os.path.join(dst_dir,
-                                    os.path.split(data_filename)[1])
-
-    if not bin_width is None:
-        dst_filename += ".{}".format(bin_width)
 
     pq = Picoquant(data_filename)
 
     if photon_mode is None:
         photon_mode = pq.mode()
 
-    if photon_mode == "t3":
-        if repetition_rate is None:
-            repetition_rate = pq.repetition_rate()
+    if repetition_rate is None:
+        if photon_mode == "t3":
+            repetition_rate = int(pq.repetition_rate())
+        else:
+            repetition_rate = DEFAULT_REPETITION_RATE
 
-        repetition_time = 1e12/repetition_rate    
+    repetition_time = 1e12/repetition_rate    
         
     if channels is None:
         channels = pq.channels()
@@ -154,8 +149,12 @@ def gn(data_filename, dst_dir=None, dst_filename=None,
     if gn_mode is None:
         gn_mode = photon_mode
         convert = False
-    else:
+    elif gn_mode == photon_mode:
+        convert = False
+    elif gn_mode == "t2" and photon_mode == "t3":
         convert = True
+    else:
+        raise(ValueError("Can't trans t2 file into t3"))
 
     if time_threshold:
         channels = 4            
@@ -168,11 +167,12 @@ def gn(data_filename, dst_dir=None, dst_filename=None,
             # Determine the resolution-limited time bins from the t3 file.
             resolution = int(pq.resolution())
 
-            if data_filename.endswith("ht3"):
-                n_bins = 2**15
-            else:
-                raise(ValueError("Unsupported file type for "
-                                 "lifetime: {}".format(t3_filename)))
+            n_bins = 2**15
+#            if data_filename.endswith("ht3"):
+#                n_bins = 2**15
+#            else:
+#                raise(ValueError("Unsupported file type for "
+#                                 "lifetime: {}".format(t3_filename)))
 
             time_bins = Limits(0, resolution*n_bins, n_bins=n_bins)
         elif gn_mode == "t3" and order >= 2:
@@ -191,18 +191,17 @@ def gn(data_filename, dst_dir=None, dst_filename=None,
             raise(ValueError("Unsupported mode for automatic time bins"
                              ": {}".format(mode)))
 
-    if photon_number:
-        channels = sum(range(1, channels+1))
-        dst_filename += ".number"
+    # if photon_number:
+        # channels = sum(range(1, channels+1))
+        # dst_filename += ".number"
 
-        if number_correlate:
-            dst_filename += ".corr"
+        # if number_correlate:
+            # dst_filename += ".corr"
 
-    if convert:
-        dst_filename += ".{}".format(gn_mode)
+#    if convert:
+#        dst_filename += ".{}".format(gn_mode)
 
     gn_cmd = ["photon_gn",
-              "--file-out", dst_filename,
               "--mode", gn_mode,
               "--order", str(order),
               "--time", str(time_bins)]
@@ -222,35 +221,35 @@ def gn(data_filename, dst_dir=None, dst_filename=None,
     if window_width and not time_threshold:
         gn_cmd.extend(("--window-width", str(window_width)))
 
-    photons = picoquant(data_filename, time_offsets=time_offsets)
+    photons = picoquant(data_filename, time_offsets=time_offsets, convert=convert)
 
-    if convert:
-        # fiddle with time bin defintions
-        photons = convert_mode(photons, photon_mode, gn_mode, repetition_rate)
-        
     if photon_number:
         photons = number_to_channels(photons, correlate=number_correlate)
-    elif time_threshold:
+    elif threshold_min or threshold_max:
         photons = photon_threshold(photons, window_width=window_width,
-                                   mode=gn_mode, threshold=threshold)
+                                   mode=gn_mode, threshold_min=threshold_min,
+                                                 threshold_max=threshold_max)
+    elif time_threshold:
         photons = photon_time_threshold(photons, correlate=number_correlate,
                                         time_threshold=time_threshold)
 
     gn_cmd.extend(("--channels", str(channels)))
     
-    gn = subprocess.Popen(gn_cmd,
-                          stdin=photons.stdout).wait()
+    gn = StringIO(subprocess.Popen(gn_cmd, stdin=photons.stdout,
+                  stdout=subprocess.PIPE).stdout.read().decode())
 
-    if bin_width is not None:
-        # In case of time-dependent results, bzip2 the files to save space.
-        root, filename = os.path.split(dst_filename)
+    # if bin_width is not None:
+        # # In case of time-dependent results, bzip2 the files to save space.
+        # root, filename = os.path.split(dst_filename)
 
-        for my_root, dirs, files in os.walk(root):
-            for filename in files:
-                if filename.endswith("td"):
-                    dst = os.path.join(my_root, filename)
-                    logging.info("Compressing {}".format(dst))
-                    subprocess.Popen(["bzip2", dst]).wait()
+        # for my_root, dirs, files in os.walk(root):
+            # for filename in files:
+                # if filename.endswith("td"):
+                    # dst = os.path.join(my_root, filename)
+                    # logging.info("Compressing {}".format(dst))
+                    # subprocess.Popen(["bzip2", dst]).wait()
+
+    return(gn)
 
 def flid(src_filename, dst_filename, intensity_bins,
          window_width, time_bins=None, time_offsets=None):

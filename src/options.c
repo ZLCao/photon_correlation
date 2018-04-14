@@ -237,12 +237,16 @@ static pc_option_t pc_options_all[] = {
 			"Specifies the sync divider, which effectively tells\n"
 			"how many sync events are skipped between recorded\n"
 			"events."},
-	{'n', "n:", "threshold",
+	{'n', "n:", "threshold_min",
 			"The minimum number of photons in a window to be\n"
 			"considered for calculation."},
-	{'N', "N:", "time-threshold",
+	{'N', "N:", "threshold_max",
+			"The maximum number of photons in a window to be\n"
+			"considered for calculation."},
+	{'t', "t:", "time-threshold",
 			"The time dividing early and late arrivals, in ps."},
 	};
+	// L, r, t, T: idle options
 
 
 static struct option pc_options_long[] = {
@@ -319,10 +323,11 @@ static struct option pc_options_long[] = {
 	{"sync-divider", required_argument, 0, 'J'},
 
 /* threshold */
-	{"threshold", required_argument, 0, 'n'},
+	{"threshold_min", required_argument, 0, 'n'},
+	{"threshold_max", required_argument, 0, 'N'},
 
 /* time threshold */
-	{"time-threshold", required_argument, 0, 'N'},
+	{"time-threshold", required_argument, 0, 't'},
 
 	{0, 0, 0, 0}};
 
@@ -440,7 +445,8 @@ void pc_options_default(pc_options_t *options) {
 	options->sync_channel = 0;
 	options->sync_divider = 0;
 
-	options->threshold = 0;
+	options->threshold_min = 0;
+	options->threshold_max = 1000000;
 	options->time_threshold = 0;
 }
 
@@ -686,9 +692,12 @@ int pc_options_parse(pc_options_t *options,
 				options->sync_divider = strtoul(optarg, NULL, 10);
 				break;
 			case 'n':
-				options->threshold = strtoul(optarg, NULL, 10);
+				options->threshold_min = strtoul(optarg, NULL, 10);
 				break;
 			case 'N':
+				options->threshold_max = strtoul(optarg, NULL, 10);
+				break;
+			case 't':
 				options->time_threshold = strtoull(optarg, NULL, 10);
 				break;
 			case '?':
@@ -1003,7 +1012,8 @@ int pc_options_fprintf(FILE *stream_out, pc_options_t const *options) {
 	fprintf(stream_out, "sync_channel = %u\n", options->sync_channel);
 	fprintf(stream_out, "sync_divider = %u\n", options->sync_divider);
 
-	fprintf(stream_out, "threshold = %u\n", options->threshold);
+	fprintf(stream_out, "threshold_min = %u\n", options->threshold_min);
+	fprintf(stream_out, "threshold_max = %u\n", options->threshold_max);
 
 	fprintf(stream_out, "time_threshold = %llu\n", options->time_threshold);
 

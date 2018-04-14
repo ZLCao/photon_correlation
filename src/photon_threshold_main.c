@@ -38,8 +38,8 @@ int main(int argc, char *argv[]) {
 "For a given threshold, only yield photons from time windows with at least\n"
 "that many photons.\n",
 		{OPT_VERBOSE, OPT_HELP, OPT_VERSION,
-			OPT_FILE_IN, OPT_FILE_OUT,
-			OPT_MODE, OPT_THRESHOLD, OPT_WINDOW_WIDTH,
+			OPT_FILE_IN, OPT_FILE_OUT, OPT_MODE,
+			OPT_THRESHOLD_MIN, OPT_THRESHOLD_MAX, OPT_WINDOW_WIDTH,
 			OPT_EOF}};
 
 	return(run(&program_options, photon_threshold, argc, argv));

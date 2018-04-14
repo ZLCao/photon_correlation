@@ -7,6 +7,7 @@ import statistics
 
 import numpy
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 
 from .Blinking import *
 from .util import *
@@ -18,14 +19,22 @@ class Intensity(object):
     """
     Implements the tools necessary for analyzing intensity data.
     """
-    def __init__(self, filename=None, mode="t3", times=list(), counts=dict()):
-        self.filename = filename
+    def __init__(self, stream_in=None, filename=None, mode=None):
         self.times = list()
         self.counts = dict()
-        self.mode = mode
 
-        if self.filename is not None:
+        if stream_in is not None:
+            self.from_stream(stream_in)
+        elif filename is not None:
             self.from_file(filename)
+
+        if mode is not None:
+            self.mode = mode
+        else:
+            if sum(self[0]):
+                self.mode = "t2"
+            else:
+                self.mode = "t3"
 
     def __getitem__(self, channel):
         return(self.counts[channel])
@@ -62,15 +71,29 @@ class Intensity(object):
     def channels(self):
         return(len(self.counts.keys()))
 
+    def from_stream(self, stream_in):
+        raw_counts = list()
+
+        for line in csv.reader(stream_in):
+            bin_left = int(line[0])
+            bin_right = int(line[1])
+
+            counts = tuple(map(int, line[2:]))
+
+            self.times.append((bin_left, bin_right))
+
+            raw_counts.append(counts)
+
+        for channel, counts in enumerate(numpy.transpose(raw_counts)):
+            self[channel] = counts
+    
+        return(self)
+
     def from_file(self, filename):
         """
         Read data from the file and return an intensity object wtih
         that data.
         """
-        self.filename = filename
-        
-        raw_counts = list()
-
         if not os.path.exists(filename):
             bz2_name = "{}.bz2".format(filename)
             if os.path.exists(bz2_name):
@@ -81,19 +104,8 @@ class Intensity(object):
         else:
             open_f = open
         with open_f(filename) as stream_in:
-            for line in csv.reader(stream_in):
-                bin_left = int(line[0])
-                bin_right = int(line[1])
+            return(self.from_stream(stream_in))
 
-                counts = tuple(map(int, line[2:]))
-
-                self.times.append((bin_left, bin_right))
-
-                raw_counts.append(counts)
-
-        for channel, counts in enumerate(numpy.transpose(raw_counts)):
-            self[channel] = counts
-    
         return(self)
 
     def stream(self):
@@ -108,30 +120,32 @@ class Intensity(object):
             return("s")
         elif self.mode == "t3":
             return("pulse")
-        else:
-            mode_error(self.mode)
 
     def normalized(self):
         """
         Return the counts, normalized to pulse or time as necessary.
         """
+        intensity = Intensity(mode=self.mode)
+        
         if self.mode == "t2":
             time_factor = 1e-12
-            norm = lambda t, c: float(c)/(t[1]-t[0])*1e12
-        elif self.mode == "t3":
-            norm = lambda t, c: float(c)/(t[1]-t[0])
-        else:
-            mode_error(self.mode)
+            # for index, time in enumerate(numpy.array(self.times)*1e-12):
+                # intensity.times.append(tuple(time))
 
-        intensity = Intensity(mode=self.mode)
-        intensity.times = self.times
-        
+            intensity.times = list(map(lambda x: (x[0] * time_factor,
+                                       x[1] * time_factor), self.times))
+
+        elif self.mode == "t3":
+            intensity.times = self.times
+
+        norm = lambda t, c: float(c)/(t[1]-t[0])
+
         for channel, counts in self:
-            intensity[channel] = list(map(norm, self.times, counts))
+            intensity[channel] = list(map(norm, intensity.times, counts))
 
         return(intensity)
 
-    def add_to_axes(self, ax):
+    def add_intensity_axes(self, ax):
         """
         Add the lifetime information to the specified set of axes.
         """
@@ -142,7 +156,8 @@ class Intensity(object):
         else:
 
             for channel, counts in self:
-                ax.plot(times, counts, label=str(channel))
+                if max(counts):
+                    ax.plot(times, counts, label=str(channel))
 
             ax.legend()
 
@@ -150,11 +165,14 @@ class Intensity(object):
         ax.set_xlabel("Time/{}".format(self.time_unit()))
         ax.set_ylabel("Intensity/(count/{})".format(self.time_unit()))
 
-        return(ax)
-
     def make_figure(self):
         fig = plt.figure()
-        self.add_to_axes(fig.add_subplot(111))
+        spec = gridspec.GridSpec(ncols=4, nrows=1)
+        ax_intensity = fig.add_subplot(spec[0, :-1])
+        ax_histogram = fig.add_subplot(spec[0, -1])
+        self.add_intensity_axes(ax_intensity)
+        self.add_histogram_axes(ax=ax_histogram)
+        fig.tight_layout()
         return(fig)
         
     def n_channels(self):
@@ -184,7 +202,7 @@ class Intensity(object):
         
         return(intensity)
     
-    def histogram(self, bins=30, summed=True):
+    def histogram(self, bins=200, summed=True):
         """
         Produce a histogram of intensities found in the intensity trace.
         """
@@ -203,19 +221,16 @@ class Intensity(object):
 
             return(hists)
             
-    def make_histogram_figure(self, bins=30):
-        fig = plt.figure()
-
-        ax = fig.add_subplot(111)
+    def add_histogram_axes(self, ax, bins=200):
 
         counts, bins = self.histogram(bins=bins)
 
-        ax.bar(bins[:-1], counts, width=statistics.mean(numpy.diff(bins)))
-
-        ax.set_xlabel("Intensity/(counts/{})".format(self.time_unit()))
-        ax.set_ylabel("Occurences")
-
-        return(fig)
+        ax.barh(bins[:-1], counts, height=statistics.mean(numpy.diff(bins)))
+        
+        ax.set_xlabel("Occurences")
+        ax.yaxis.set_ticks_position("right")
+        # ax.yaxis.set_ticklabels([])
+        # ax.set_ylabel("Intensity/(counts/{})".format(self.time_unit()))
 
     def blinking(self):
         """
@@ -232,8 +247,8 @@ class Intensity(object):
         times = list(map(lambda x: (x[0]/repetition_rate,
                                     x[1]/repetition_rate),
                          self.times))
-        intensity = Intensity(mode=None)
 
+        intensity = Intensity(mode="t2")
         intensity.times = times
 
         norm = self.normalized()

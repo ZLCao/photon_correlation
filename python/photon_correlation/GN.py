@@ -5,14 +5,14 @@ import os
 from .util import is_cross_correlation
 
 class GN(object):
-    def __init__(self, filename=None, stream=None,
+    def __init__(self, stream=None, filename=None,
                  bins=None, counts=None):
         self._counts = dict()
 
-        if filename is not None:
-            self.from_file(filename)
-        elif stream is not None:
+        if stream is not None:
             self.from_stream(stream)
+        elif filename is not None:
+            self.from_file(filename)
         elif bins is not None and counts is not None:
             stream = map(lambda x, y: list(x) + [y], zip(*bins), counts)
 
@@ -47,7 +47,7 @@ class GN(object):
             open_f = open
             
         with open_f(filename) as stream_in:
-            return(self.from_stream(csv.reader(stream_in)))
+            return(self.from_stream(stream_in))
 
     def to_file(self, filename):
         with open(filename, "w") as stream_out:
