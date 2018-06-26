@@ -71,6 +71,48 @@ class G1(GN):
         
         return(Lifetime(counts, times=self[curve].times))
 
+    def export_lifetime(self, filename):
+        with open(filename, 'w') as csvfile:
+            csvline = csv.writer(csvfile)
+
+            line = ['Time', 'Count'] * (len(self)-1)
+            csvline.writerow(line)
+
+            line = ['ns', ''] * (len(self)-1)
+            csvline.writerow(line)
+
+            line = list()
+            max_index = 0
+
+            for curve in self:
+                if curve:
+                    if int(curve/10):
+                        line += [''] 
+                        line += ['Channel {} fitted'.format(curve%10)]
+                    else:
+                        line += ['']
+                        line += ['Channel {}'.format(curve)]
+
+                    curve_max_index = self[curve].final_nonzero()
+
+                    if max_index < curve_max_index:
+                        max_index = curve_max_index
+
+            csvline.writerow(line)
+
+            for i in range(max_index):
+                line = list()
+                for curve in self:
+                    if curve:
+                        if i < len(self[curve].times):
+                            line.append(self[curve].times[i][0]*1e-3)
+                            line.append(self[curve].counts[i])
+                        else:
+                            line.append('')
+                            line.append('')
+
+                csvline.writerow(line)
+
     def add_to_axes(self, ax, resolution=None):
         max_xlim = 0
 
@@ -83,7 +125,10 @@ class G1(GN):
                 times = list(map(lambda x: x[0]*1e-3, lifetime.times))
                 counts = lifetime.counts
                              
-                ax.semilogy(times, counts, label=str(curve))
+                if int(curve/10):
+                    ax.semilogy(times, counts, label=str(curve%10) + ' fitted')
+                else:
+                    ax.semilogy(times, counts, label=str(curve))
      
                 my_max = times[final_nonzero(counts)]
      
@@ -91,11 +136,11 @@ class G1(GN):
                     max_xlim = my_max
                 
         ax.set_xlabel("Time/ns")
-        ax.set_ylabel("Counts")
+        ax.set_ylabel("Count")
         ax.set_xlim((0, max_xlim))
         ax.legend()
         
     def make_figure(self, resolution=None):
         fig = plt.figure()
         self.add_to_axes(fig.add_subplot(111), resolution=resolution)
-        return(fig)
+#        return(fig)

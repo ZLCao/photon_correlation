@@ -137,14 +137,14 @@ class Lifetime(object):
 
         return(self.range(self.time_bins[index_left],
                           self.time_bins[index_right]))
-        
+
     def exponential_fit(self,
                         min_val=None,
                         max_val=None,
                         time_range=None,
                         n_exponentials=1,
                         initial_conditions=None,
-                        error_func="square difference",
+                        # error_func="square difference",
                         **args):
         
         fit_times = list()
@@ -162,17 +162,31 @@ class Lifetime(object):
                 fit_times.append(fit_time)
                 fit_counts.append(fit_count)
 
+        def find_initial_conditions():
+            init_conditions = list()
+
+            for i in range(n_exponentials):
+                init_conditions.append(fit_counts[0]/n_exponentials)
+                ti = bisect.bisect(sorted(fit_counts), fit_counts[0]/20**(i+1))
+                init_conditions.append(1 / (fit_times[-ti-1]-fit_times[0]) \
+                                         / (1+i/10))  # -1 防止 ti = 0
+
+            init_conditions.append(fit_counts[-1])
+
+            return(init_conditions)
+            
         if initial_conditions is None:
-            init_a = max(fit_counts)
-            initial_conditions = [init_a/n_exponentials, 1/fit_times[-1]] \
-                                 * n_exponentials + [0]
+#            init_a = max(fit_counts)
+#            initial_conditions = [init_a/n_exponentials, 1/fit_times[-1]] \
+#                                 * n_exponentials + [0]
+            initial_conditions = find_initial_conditions()
         else:
             if len(initial_conditions) % 2:
                 n_exponentials = (len(initial_conditions)-1)/2
             else:
                 n_exponentials = len(initial_conditions) / 2
                 initial_conditions.append(0)
-
+        
         if n_exponentials*2+1 != len(initial_conditions):
             raise(ValueError("Dimension mismatch: expected {} parameters for "
                              "{} exponentials, but got {}".format(
@@ -215,12 +229,23 @@ class Lifetime(object):
            return sum(map(lambda a, r:
                       a * numpy.exp(-r*(x-fit_times[0])), amp, rate))
 
+#        popt, pcov = scipy.optimize.curve_fit(func, fit_times, fit_counts,
+#                p0=initial_conditions, bounds=(0, numpy.inf), method='dogbox')
+
         popt, pcov = scipy.optimize.curve_fit(func, fit_times, fit_counts,
-                p0=initial_conditions, bounds=(0, numpy.inf), method='dogbox')
+                p0=initial_conditions)
 
         fit_out = func(numpy.array(fit_data.time_bins), *popt)
 
-        return(Lifetime(fit_out, fit_data.times), popt, pcov)
+        fit_table = ''
+
+        for i in range(int((len(popt)-1)/2)):
+            fit_table += 'A{} = {:.2f},\t t{} = {:.2f} ps\n'\
+                         .format(i+1, popt[2*i], i+1, 1/popt[2*i+1])
+
+        fit_table += 'B  = {:.2f}\n'.format(popt[-1])
+
+        return(Lifetime(fit_out, fit_data.times),fit_table)
 
         # return(MultiExponential(fit))
 

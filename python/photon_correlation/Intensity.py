@@ -145,6 +145,32 @@ class Intensity(object):
 
         return(intensity)
 
+    def export_Intensity(self, filename):
+        times = list(map(lambda x: x[0], self.times))
+
+        with open(filename, 'w') as csvfile:
+            csvline = csv.writer(csvfile)
+
+            line = ['Time']
+            line += ['Intensity'] * len(self)
+            csvline.writerow(line)
+
+            line = ['{}'.format(self.time_unit())]
+            line += ['count/{}'.format(self.time_unit())] * len(self)
+            csvline.writerow(line)
+
+            line = ['']
+            for channel, counts in self:
+                line.append('channel {}'.format(channel))
+            csvline.writerow(line)
+
+            for i in range(len(times)):
+                line = [times[i]]
+                for channel, counts in self:
+                    line.append(counts[i])
+                
+                csvline.writerow(line)
+
     def add_intensity_axes(self, ax):
         """
         Add the lifetime information to the specified set of axes.
@@ -173,7 +199,7 @@ class Intensity(object):
         self.add_intensity_axes(ax_intensity)
         self.add_histogram_axes(ax=ax_histogram)
         fig.tight_layout()
-        return(fig)
+#        return(fig)
         
     def n_channels(self):
         if isinstance(self.counts[0], collections.Iterable):
@@ -221,6 +247,18 @@ class Intensity(object):
 
             return(hists)
             
+    def export_histogram(self, filename, bins=200):
+        
+        counts, bins = self.histogram(bins=bins)
+
+        with open(filename, 'w') as csvfile:
+            csvline = csv.writer(csvfile)
+            csvline.writerow(['Intensity', 'Occurences'])
+
+            for i in range(len(counts)):
+                csvline.writerow([(bins[i]+bins[i+1])/2, counts[i]])
+
+
     def add_histogram_axes(self, ax, bins=200):
 
         counts, bins = self.histogram(bins=bins)

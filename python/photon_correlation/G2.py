@@ -287,6 +287,19 @@ class G2_T2(GN):
 
         return(result)
 
+    def export_g2(self, filename):
+        g2 = sorted(self.autocorrelation().items())
+
+        times = list(map(lambda x: statistics.mean(x[0])*1e-3, g2))
+        counts = list(map(lambda x: x[1], g2))
+
+        with open(filename, 'w') as csvfile:
+            csvline = csv.writer(csvfile)
+            csvline.writerow(['Time', 'g2'])
+            csvline.writerow(['ns', ''])
+            for i in range(len(times)):
+                csvline.writerow([times[i], counts[i]])
+
     def make_figure(self):
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
@@ -303,7 +316,7 @@ class G2_T2(GN):
 
         fig.tight_layout()
     
-        return(fig)
+#        return(fig)
 
 #if __name__ == "__main__":
 #    g2 = G2_T3(filename="/home/tsbischof/Documents/data/microscopy/analysis/triexciton/2014-09-04_oc2014-04-08/oc2014-04-08_1e-5_dot_009_250nW_000.ht3.g2.run/g2")

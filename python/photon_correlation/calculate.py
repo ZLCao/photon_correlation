@@ -21,7 +21,7 @@ def apply_t3_time_offsets(photons, time_offsets, repetition_rate):
 
     return(subprocess.Popen(cmd, stdin=photons.stdout, stdout=subprocess.PIPE))
 
-def picoquant(filename, print_every=1000000, time_offsets=None,
+def picoquant(filename, print_every=0, time_offsets=None,
               number=None, convert=False):
     cmd = ["picoquant"]
 
@@ -212,14 +212,16 @@ def gn(data_filename, photon_mode=None, gn_mode=None,
 
         gn_cmd.extend(("--pulse", str(pulse_bins)))
 
-    if not bin_width is None:
-        gn_cmd.extend(("--bin-width", str(bin_width)))
 
-        if window_width is None:
-            gn_cmd.extend(("--window-width", str(bin_width)))
+#    if not bin_width is None:
+#        gn_cmd.extend(("--bin-width", str(bin_width)))
+#
+#        if window_width is None:
+#            gn_cmd.extend(("--window-width", str(bin_width)))
+#
+#    if window_width and not time_threshold:
+#        gn_cmd.extend(("--window-width", str(window_width)))
 
-    if window_width and not time_threshold:
-        gn_cmd.extend(("--window-width", str(window_width)))
 
     photons = picoquant(data_filename, time_offsets=time_offsets, convert=convert)
 
